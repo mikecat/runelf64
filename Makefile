@@ -5,7 +5,7 @@ LDFLAGS=-static
 
 TARGET=runelf64
 
-OBJS=runelf64_main.o
+OBJS=runelf64_main.o read_file.o
 
 $(TARGET): $(OBJS)
 	$(LD) $(LDFLAGS) -o $@ $^

@@ -1,7 +1,9 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include <assert.h>
+#include "read_file.h"
 
 #define OPTION_NAME_MAX 2
 
@@ -215,5 +217,13 @@ int main(int argc, char* argv[]) {
 		return option_error ? 1 : 0;
 	}
 
+	size_t elfSize = 0;
+	void* elfData = readFile(&elfSize, elf_name);
+	if (elfData == NULL) {
+		fputs("failed to read ELF file\n", stderr);
+		return 1;
+	}
+
+	free(elfData);
 	return 0;
 }
