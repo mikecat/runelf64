@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <assert.h>
 #include "read_file.h"
+#include "parse_elf.h"
 
 #define OPTION_NAME_MAX 2
 
@@ -223,7 +224,13 @@ int main(int argc, char* argv[]) {
 		fputs("failed to read ELF file\n", stderr);
 		return 1;
 	}
+	struct elf_info* elfInfo = parse_elf(elfData, elfSize);
+	if (elfInfo == NULL) {
+		free(elfData);
+		return 1;
+	}
 
+	free_elf_info(elfInfo);
 	free(elfData);
 	return 0;
 }
