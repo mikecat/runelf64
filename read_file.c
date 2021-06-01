@@ -40,6 +40,7 @@ void* readFile(size_t* size, const char* fileName) {
 			}
 			buffer = newBuffer;
 			memcpy(buffer + curSize, chunk, sizeRead);
+			curSize += sizeRead;
 		}
 		if (feof(fp)) {
 			fclose(fp);
