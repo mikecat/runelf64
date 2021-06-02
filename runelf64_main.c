@@ -96,11 +96,13 @@ int str_to_int64(int64_t* out, const char* str) {
 
 int main(int argc, char* argv[]) {
 	int help = 0;
+	int show_info = 0;
 	char* elf_name = NULL;
 
 	int option_error = 0;
 	const struct option_info options[] = {
-		{{"-h", "--help"}, "show this help", OPTION_EXISTANCE, &help}
+		{{"-h", "--help"}, "show this help", OPTION_EXISTANCE, &help},
+		{{"--show-info"}, "show ELF information", OPTION_EXISTANCE, &show_info}
 	};
 	const size_t option_num = sizeof(options) / sizeof(*options);
 
@@ -228,6 +230,10 @@ int main(int argc, char* argv[]) {
 	if (elf_info == NULL) {
 		free(elf_data);
 		return 1;
+	}
+
+	if (show_info) {
+		dump_elf_info(elf_info, elf_data);
 	}
 
 	free_elf_info(elf_info);

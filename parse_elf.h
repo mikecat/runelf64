@@ -73,4 +73,6 @@ struct elf_info* parse_elf(const void* data, size_t size);
 
 void free_elf_info(struct elf_info* data);
 
+void dump_elf_info(const struct elf_info* info, const void* data);
+
 #endif

@@ -290,3 +290,132 @@ void free_elf_info(struct elf_info* data) {
 		free(data);
 	}
 }
+
+void dump_elf_info(const struct elf_info* info, const void* data) {
+	if (info == NULL || data == NULL) return;
+	{
+		const char* class_str = "", *encoding_str = "";
+		switch (info->header.ident.elf_class) {
+			case 1: class_str = " (32bit)"; break;
+			case 2: class_str = " (64bit)"; break;
+		}
+		switch (info->header.ident.data_encoding) {
+			case 1: encoding_str = " (little endian)"; break;
+			case 2: encoding_str = " (big endian)"; break;
+		}
+		printf("class: 0x%02" PRIx8 "%s encoding: 0x%02" PRIx8 "%s ident_version: %" PRIu8 "\n",
+			info->header.ident.elf_class, class_str, info->header.ident.data_encoding, encoding_str,
+			info->header.ident.version);
+	}
+	{
+		const char* type_str = "", *machine_str = "";
+		switch (info->header.type) {
+			case 0: type_str = " (ET_NONE)"; break;
+			case 1: type_str = " (ET_REL)"; break;
+			case 2: type_str = " (ET_EXEC)"; break;
+			case 3: type_str = " (ET_DYN)"; break;
+			case 4: type_str = " (ET_CORE)"; break;
+		}
+		switch (info->header.machine) {
+			case 0: machine_str = " (none)"; break;
+			case 1: machine_str = " (AT&T WE 32100)"; break;
+			case 2: machine_str = " (SPARC)"; break;
+			case 3: machine_str = " (Intel)"; break;
+			case 4: machine_str = " (Motorola 68000)"; break;
+			case 5: machine_str = " (Motorola 88000)"; break;
+			case 7: machine_str = " (Intel 80860)"; break;
+			case 8: machine_str = " (MIPS RS3000)"; break;
+			case 10: machine_str = " (MIPS RS4000)"; break;
+			case 11: case 12: case 13: case 14: case 15: case 16: machine_str = " (reserved)"; break;
+		}
+		char type_buf[32];
+		snprintf(type_buf, sizeof(type_buf),
+			info->header.type >= UINT16_C(0xff00) ? "0x%" PRIx16 : "%" PRIu16, info->header.type);
+		printf("type: %s%s machine: %" PRIu16 "%s version: %" PRIu32 "\n",
+			type_buf, type_str, info->header.machine, machine_str, info->header.version);
+	}
+	printf("entry_address: 0x%016" PRIx64 " flags: 0x%08" PRIx32 " string_section: %" PRIu16 "\n",
+		info->header.entry_address, info->header.flags, info->header.string_section_index);
+
+	if (info->header.program_table_entry_num > 0) {
+		printf("\nprogram headers\n");
+		int width = 1;
+		for (uint16_t num = info->header.program_table_entry_num; num > 9; num /= 10) width++;
+		for (uint16_t i = 0; i < info->header.program_table_entry_num; i++) {
+			const char* type_str = "";
+			switch (info->program_headers[i].type) {
+				case 0: type_str = " (PT_NULL)"; break;
+				case 1: type_str = " (PT_LOAD)"; break;
+				case 2: type_str = " (PT_DYNAMIC)"; break;
+				case 3: type_str = " (PT_INTERP)"; break;
+				case 4: type_str = " (PT_NOTE)"; break;
+				case 5: type_str = " (PT_SHLIB)"; break;
+				case 6: type_str = " (PT_PHDR)"; break;
+			}
+			char type_buf[32];
+			snprintf(type_buf, sizeof(type_buf),
+				info->program_headers[i].type >= UINT32_C(0x10000000) ? "0x%" PRIx32 : "%" PRIu32, info->program_headers[i].type);
+			char flags_str[] = "---";
+			if (info->program_headers[i].flags & 0x4) flags_str[0] = 'R';
+			if (info->program_headers[i].flags & 0x2) flags_str[1] = 'W';
+			if (info->program_headers[i].flags & 0x1) flags_str[2] = 'X';
+			printf("\n[%*" PRIu16 "] type: %s%s flags: 0x%08" PRIx32 " (%s)\n",
+				width, i, type_buf, type_str, info->program_headers[i].flags, flags_str);
+			printf(" %*c  offset: 0x%016" PRIx64 " file_size: 0x%016" PRIx64 "\n",
+				width, ' ', info->program_headers[i].offset, info->program_headers[i].file_size);
+			printf(" %*c  virtual_addr: 0x%016" PRIx64 " physical_addr: 0x%016" PRIx64 "\n",
+				width, ' ', info->program_headers[i].virtual_addr, info->program_headers[i].physical_addr);
+			printf(" %*c  memory_size: 0x%016" PRIx64 " align: 0x%016" PRIx64 "\n",
+				width, ' ', info->program_headers[i].memory_size, info->program_headers[i].align);
+		}
+	}
+
+	if (info->header.section_table_entry_num > 0) {
+		printf("\nsection headers\n");
+		int width = 1;
+		for (uint16_t num = info->header.section_table_entry_num; num > 9; num /= 10) width++;
+		const uint8_t* str_table = info->header.string_section_index > 0 ?
+			(const uint8_t*)data + info->section_headers[info->header.string_section_index].offset : NULL;
+		for (uint16_t i = 0; i < info->header.section_table_entry_num; i++) {
+			printf("\n[%*" PRIu16 "] name: ", width,i);
+			if (str_table == NULL) {
+				printf("0x%08" PRIx32 "\n", info->section_headers[i].name_idx);
+			} else {
+				printf("%s (0x%08" PRIx32 ")\n",
+					(const char*)(str_table + info->section_headers[i].name_idx),
+					info->section_headers[i].name_idx);
+			}
+			const char* type_str = "";
+			switch (info->section_headers[i].type) {
+				case 0: type_str = " (SHT_NULL)"; break;
+				case 1: type_str = " (SHT_PROGBITS)"; break;
+				case 2: type_str = " (SHT_SYMTAB)"; break;
+				case 3: type_str = " (SHT_STRTAB)"; break;
+				case 4: type_str = " (SHT_RELA)"; break;
+				case 5: type_str = " (SHT_HASH)"; break;
+				case 6: type_str = " (SHT_DYNAMIC)"; break;
+				case 7: type_str = " (SHT_NOTE)"; break;
+				case 8: type_str = " (SHT_NOBITS)"; break;
+				case 9: type_str = " (SHT_REL)"; break;
+				case 10: type_str = " (SHT_SHLIB)"; break;
+				case 11: type_str = " (SHT_DYNSYM)"; break;
+			}
+			char type_buf[32];
+			snprintf(type_buf, sizeof(type_buf),
+				info->section_headers[i].type >= UINT32_C(0x10000000) ? "0x%" PRIx32 : "%" PRIu32, info->section_headers[i].type);
+			char flags_str[] = "---";
+			if (info->section_headers[i].flags & 0x4) flags_str[0] = 'E';
+			if (info->section_headers[i].flags & 0x2) flags_str[1] = 'A';
+			if (info->section_headers[i].flags & 0x1) flags_str[2] = 'W';
+			printf(" %*c  type: %s%s flags: 0x%016" PRIx64 " (%s)\n",
+				width, ' ', type_buf, type_str, info->section_headers[i].flags, flags_str);
+			printf(" %*c  address: 0x%016" PRIx64 " addr_align: 0x%016" PRIx64 "\n",
+				width, ' ', info->section_headers[i].addr, info->section_headers[i].addr_align);
+			printf(" %*c  offset: 0x%016" PRIx64 " size: 0x%016" PRIx64 "\n",
+				width, ' ', info->section_headers[i].offset, info->section_headers[i].size);
+			printf(" %*c  link: 0x%08" PRIx32 " info: 0x%08" PRIx32 " entry_size: 0x%016" PRIx64 "\n",
+				width, ' ', info->section_headers[i].link, info->section_headers[i].info,
+				info->section_headers[i].entry_size);
+		}
+	}
+}
