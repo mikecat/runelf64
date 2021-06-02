@@ -6,45 +6,45 @@
 
 #define CHUNK_SIZE 4096
 
-void* readFile(size_t* size, const char* fileName) {
-	if (size == NULL || fileName == NULL) return NULL;
+void* read_file(size_t* size, const char* file_name) {
+	if (size == NULL || file_name == NULL) return NULL;
 	char* buffer = NULL;
-	size_t curSize = 0;
-	FILE* fp = fopen(fileName, "rb");
+	size_t cur_size = 0;
+	FILE* fp = fopen(file_name, "rb");
 	if (fp == NULL) {
-		perror("readFile: fopen");
+		perror("read_file: fopen");
 		return NULL;
 	}
 	for (;;) {
 		char chunk[CHUNK_SIZE];
-		size_t sizeRead = fread(chunk, 1, CHUNK_SIZE, fp);
+		size_t size_read = fread(chunk, 1, CHUNK_SIZE, fp);
 		if (ferror(fp)) {
-			fputs("readFile: read error\n", stderr);
+			fputs("read_file: read error\n", stderr);
 			fclose(fp);
 			free(buffer);
 			return NULL;
 		}
-		if (sizeRead > 0) {
-			if (curSize > SIZE_MAX - sizeRead) {
-				fputs("readFile: file too large\n", stderr);
+		if (size_read > 0) {
+			if (cur_size > SIZE_MAX - size_read) {
+				fputs("read_file: file too large\n", stderr);
 				fclose(fp);
 				free(buffer);
 				return NULL;
 			}
-			char* newBuffer = realloc(buffer, curSize + sizeRead);
-			if (newBuffer == NULL) {
-				perror("readFile: realloc");
+			char* new_buffer = realloc(buffer, cur_size + size_read);
+			if (new_buffer == NULL) {
+				perror("read_file: realloc");
 				fclose(fp);
 				free(buffer);
 				return NULL;
 			}
-			buffer = newBuffer;
-			memcpy(buffer + curSize, chunk, sizeRead);
-			curSize += sizeRead;
+			buffer = new_buffer;
+			memcpy(buffer + cur_size, chunk, size_read);
+			cur_size += size_read;
 		}
 		if (feof(fp)) {
 			fclose(fp);
-			*size = curSize;
+			*size = cur_size;
 			return buffer;
 		}
 	}

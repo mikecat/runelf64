@@ -218,19 +218,19 @@ int main(int argc, char* argv[]) {
 		return option_error ? 1 : 0;
 	}
 
-	size_t elfSize = 0;
-	void* elfData = readFile(&elfSize, elf_name);
-	if (elfData == NULL) {
+	size_t elf_size = 0;
+	void* elf_data = read_file(&elf_size, elf_name);
+	if (elf_data == NULL) {
 		fputs("failed to read ELF file\n", stderr);
 		return 1;
 	}
-	struct elf_info* elfInfo = parse_elf(elfData, elfSize);
-	if (elfInfo == NULL) {
-		free(elfData);
+	struct elf_info* elf_info = parse_elf(elf_data, elf_size);
+	if (elf_info == NULL) {
+		free(elf_data);
 		return 1;
 	}
 
-	free_elf_info(elfInfo);
-	free(elfData);
+	free_elf_info(elf_info);
+	free(elf_data);
 	return 0;
 }
