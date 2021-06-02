@@ -45,9 +45,23 @@ struct elf_program_header {
 	uint64_t align;
 };
 
+struct elf_section_header {
+	uint32_t name_idx;
+	uint32_t type;
+	uint64_t flags;
+	uint64_t addr;
+	uint64_t offset;
+	uint64_t size;
+	uint32_t link;
+	uint32_t info;
+	uint64_t addr_align;
+	uint64_t entry_size;
+};
+
 struct elf_info {
 	struct elf_header header;
 	struct elf_program_header* program_headers;
+	struct elf_section_header* section_headers;
 };
 
 /*

@@ -187,8 +187,14 @@ struct elf_info* parse_elf(const void* data, size_t size) {
 	}
 
 	if (result->header.section_table_entry_num > 0) {
+		uint16_t sh_expected_size = result->header.ident.elf_class== ELF_CLASS_32BIT ? 0x28 : 0x40;
+		if (result->header.section_table_entry_size < sh_expected_size) {
+			fprintf(stderr, "section header table entry too small (expected" PRIu16 ", actual " PRIu16 ")\n",
+				sh_expected_size, result->header.section_table_entry_size);
+			free_elf_info(result);
+			return NULL;
+		}
 		uint32_t section_table_size = (uint32_t)result->header.section_table_entry_size * result->header.section_table_entry_num;
-		
 		if(section_table_size > size || result->header.section_table_offset > size - section_table_size) {
 			fprintf(stderr, "section header table (offset 0x" PRIx64 ", size 0x" PRIx32 ") out-of-data\n",
 				result->header.section_table_offset, section_table_size);
@@ -200,6 +206,78 @@ struct elf_info* parse_elf(const void* data, size_t size) {
 				result->header.string_section_index, result->header.section_table_entry_num);
 			free_elf_info(result);
 			return NULL;
+		}
+		result->section_headers = malloc(sizeof(*result->section_headers) * result->header.section_table_entry_num);
+		if (result->section_headers == NULL) {
+			perror("malloc");
+			free_elf_info(result);
+			return NULL;
+		}
+		for (uint32_t i = 0; i < result->header.section_table_entry_num; i++) {
+			const uint8_t* entry = udata + result->header.section_table_offset + (uint32_t)result->header.section_table_entry_size * i;
+			if (result->header.ident.elf_class== ELF_CLASS_32BIT) {
+				result->section_headers[i].name_idx = read32(entry + 0x00);
+				result->section_headers[i].type = read32(entry + 0x04);
+				result->section_headers[i].flags = read32(entry + 0x08);
+				result->section_headers[i].addr = read32(entry + 0x0c);
+				result->section_headers[i].offset = read32(entry + 0x10);
+				result->section_headers[i].size = read32(entry + 0x14);
+				result->section_headers[i].link = read32(entry + 0x18);
+				result->section_headers[i].info = read32(entry + 0x1c);
+				result->section_headers[i].addr_align = read32(entry + 0x20);
+				result->section_headers[i].entry_size = read32(entry + 0x24);
+			} else {
+				result->section_headers[i].name_idx = read32(entry + 0x00);
+				result->section_headers[i].type = read32(entry + 0x04);
+				result->section_headers[i].flags = read64(entry + 0x08);
+				result->section_headers[i].addr = read64(entry + 0x10);
+				result->section_headers[i].offset = read64(entry + 0x18);
+				result->section_headers[i].size = read64(entry + 0x20);
+				result->section_headers[i].link = read32(entry + 0x28);
+				result->section_headers[i].info = read32(entry + 0x2c);
+				result->section_headers[i].addr_align = read64(entry + 0x30);
+				result->section_headers[i].entry_size = read64(entry + 0x38);
+			}
+			uint64_t offset_in_file = result->section_headers[i].offset;
+			uint64_t size_in_file = result->section_headers[i].size;
+			if (result->section_headers[i].type != 8 && /* SHT_NOBITS */
+			size_in_file > 0 && (size_in_file > size || offset_in_file > size - size_in_file)) {
+				fprintf(stderr, "section_headers[%" PRIu32 "] out-of-file (offset 0x%" PRIx64 ", size 0x%" PRIx64 ")\n",
+					i, offset_in_file, size_in_file);
+				free_elf_info(result);
+				return NULL;
+			}
+		}
+		if (result->header.string_section_index != 0) {
+			if (result->section_headers[result->header.string_section_index].type == 8) {
+				fprintf(stderr, "string table (%" PRIu16 ") has type SHT_NOBITS\n", result->header.string_section_index);
+				free_elf_info(result);
+				return NULL;
+			}
+			struct elf_section_header* str_table = &result->section_headers[result->header.string_section_index];
+			uint64_t last_nul = str_table->size;
+			if (str_table->size > 0) {
+				if (udata[str_table->offset] == 0) last_nul = 0;
+				for (uint64_t i = str_table->size - 1; i > 0; i--) {
+					if (udata[str_table->offset + i] == 0) {
+						last_nul = i;
+						break;
+					}
+				}
+			}
+			if (last_nul >= str_table->size) {
+				fprintf(stderr, "no NUL in string table (%" PRIu16 ")\n", result->header.string_section_index);
+				free_elf_info(result);
+				return NULL;
+			}
+			for (uint32_t i = 0; i < result->header.section_table_entry_num; i++) {
+				if (result->section_headers[i].name_idx > last_nul) {
+					fprintf(stderr, "name index of section_headers[%" PRIu32 "] (" PRIu32 ") is beyond last NUL (%" PRIu64 ")\n",
+						i, result->section_headers[i].name_idx, last_nul);
+					free_elf_info(result);
+					return NULL;
+				}
+			}
 		}
 	}
 
